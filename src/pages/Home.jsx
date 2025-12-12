@@ -38,42 +38,52 @@ export default function Home() {
   };
 
   const sendMessage = async (customMessage) => {
-    const msg = customMessage || userMessage;
-    if (!msg.trim()) return;
+  const msg = customMessage || userMessage;
+  if (!msg.trim()) return;
 
-    // Add user message
-    setMessages(prev => [...prev, { sender: "user", text: msg }]);
-    setUserMessage("");
+  // Add user message
+  setMessages(prev => [...prev, { sender: "user", text: msg }]);
+  setUserMessage("");
 
-    // Check predefined replies
-    const key = msg.toLowerCase();
-    if (predefinedReplies[key]) {
-      setMessages(prev => [...prev, { sender: "bot", text: predefinedReplies[key] }]);
-      return;
-    }
+  // Try predefined replies
+  const key = msg.toLowerCase().trim();
+  if (predefinedReplies[key]) {
+    setMessages(prev => [...prev, { sender: "bot", text: predefinedReplies[key] }]);
+    return;
+  }
 
-    // Else send to backend AI
-    setMessages(prev => [...prev, { sender: "bot", text: "Typing..." }]);
-    try {
-      const res = await fetch("http://localhost:5000/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg })
-      });
-      const data = await res.json();
-      setMessages(prev => {
-        const msgs = [...prev];
-        msgs[msgs.length - 1] = { sender: "bot", text: data.reply };
-        return msgs;
-      });
-    } catch {
-      setMessages(prev => {
-        const msgs = [...prev];
-        msgs[msgs.length - 1] = { sender: "bot", text: "⚠️ Network error. Please try again." };
-        return msgs;
-      });
-    }
-  };
+  // Temporary "typing"
+  setMessages(prev => [...prev, { sender: "bot", text: "Typing..." }]);
+
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: msg }),
+    });
+
+    if (!res.ok) throw new Error("Network");
+
+    const data = await res.json();
+
+    setMessages(prev => {
+      const updated = [...prev];
+      updated[updated.length - 1] = { sender: "bot", text: data.reply };
+      return updated;
+    });
+
+  } catch (err) {
+    setMessages(prev => {
+      const updated = [...prev];
+      updated[updated.length - 1] = {
+        sender: "bot",
+        text: "⚠️ Server is unreachable. Please try again later.",
+      };
+      return updated;
+    });
+  }
+};
+
 
   // Scroll chat to bottom whenever messages update
   useEffect(() => {
